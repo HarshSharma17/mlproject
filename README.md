@@ -1,1 +1,318 @@
-## End to End Machine Learning Project
+# Student Exam Performance Prediction
+
+A machine-learning web application that predicts a student's **math score** from demographic/educational inputs and their reading and writing scores. The application is built with Python, scikit-learn, and Flask, and includes a modular training pipeline and a simple HTML interface.
+
+> **Project status:** Educational portfolio project. Validate the training/evaluation logic and test the complete form-to-prediction flow before presenting results as production-ready.
+
+## Contents
+
+- [Overview](#overview)
+- [Features](#features)
+- [Tech stack](#tech-stack)
+- [How it works](#how-it-works)
+- [Project structure](#project-structure)
+- [Dataset and features](#dataset-and-features)
+- [Run locally](#run-locally)
+- [Train the model](#train-the-model)
+- [Run the web application](#run-the-web-application)
+- [Model artifacts](#model-artifacts)
+- [Deployment options](#deployment-options)
+- [CI/CD concept](#cicd-concept)
+- [Troubleshooting](#troubleshooting)
+- [Important validation notes](#important-validation-notes)
+- [Future improvements](#future-improvements)
+- [Author](#author)
+
+## Overview
+
+The application estimates a student's math score using these input features:
+
+- Gender
+- Race/ethnicity group
+- Parental level of education
+- Lunch type
+- Test preparation course status
+- Reading score
+- Writing score
+
+The Flask UI collects these values, creates a pandas DataFrame, loads the saved preprocessing and model objects, transforms the input, and displays the predicted math score.
+
+## Features
+
+- Flask web interface with HTML templates
+- Modular data-ingestion, data-transformation, and model-training components
+- Train/test split for model evaluation
+- Numeric preprocessing with median imputation and standardization
+- Categorical preprocessing with most-frequent imputation, one-hot encoding, and scaling
+- Serialized preprocessing and model artifacts
+- Custom exception and logging modules
+- Local development support and a structure that can be adapted for cloud deployment
+
+## Tech stack
+
+| Area | Tools |
+|---|---|
+| Language | Python |
+| Web framework | Flask |
+| Data processing | pandas, NumPy |
+| Machine learning | scikit-learn |
+| Candidate regressors in training code | Random Forest, Decision Tree, Gradient Boosting, Linear Regression, XGBoost, CatBoost, AdaBoost |
+| Serialization | dill |
+| UI | HTML, Jinja templates |
+| Packaging | setuptools (`setup.py`) |
+| Deployment learning path | AWS Elastic Beanstalk or Amazon EC2; GitHub Actions for CI/CD |
+
+## How it works
+
+1. **Data ingestion:** reads `notebook/data/stud.csv`, saves a raw copy, and creates training and test CSV files under `artifacts/`.
+2. **Data transformation:** separates the target (`math_score`) from input features and builds a `ColumnTransformer`.
+   - Numeric columns: `reading_score`, `writing_score`
+   - Categorical columns: `gender`, `race_ethnicity`, `parental_level_of_education`, `lunch`, `test_preparation_course`
+3. **Model training:** evaluates regression candidates and saves the selected fitted model as `artifacts/model.pkl`.
+4. **Serialization:** saves the fitted preprocessing pipeline as `artifacts/preprocessor.pkl`.
+5. **Prediction:** the Flask application receives form data, applies the saved preprocessing object, and sends the transformed values to the model.
+6. **Result:** the predicted math score is rendered in the HTML page.
+
+## Project structure
+
+```text
+mlproject-main/
+├── app.py                         # Flask application and routes
+├── requirements.txt               # Python dependencies
+├── setup.py                       # Package configuration
+├── notebook/
+│   ├── data/stud.csv              # Dataset used by the ingestion pipeline
+│   ├── 1 . EDA STUDENT PERFORMANCE .ipynb
+│   └── 2. MODEL TRAINING.ipynb
+├── artifacts/
+│   ├── data.csv                   # Raw dataset copy (generated)
+│   ├── train.csv                  # Training split (generated)
+│   ├── test.csv                   # Test split (generated)
+│   ├── preprocessor.pkl           # Saved preprocessing pipeline
+│   └── model.pkl                  # Saved fitted model
+├── src/
+│   ├── components/
+│   │   ├── data_ingestion.py      # Read data and split train/test
+│   │   ├── data_transformation.py # Build and save preprocessing pipeline
+│   │   └── model_trainer.py       # Train and evaluate regressors
+│   ├── pipeline/
+│   │   ├── predict_pipeline.py    # Input DataFrame and prediction logic
+│   │   └── train_pipeline.py      # Training pipeline placeholder
+│   ├── exception.py               # Custom exception handling
+│   ├── logger.py                  # Logging configuration
+│   └── utils.py                   # Save/load and model-evaluation helpers
+└── templates/
+    ├── index.html                 # Landing page
+    └── home.html                  # Prediction form and output
+```
+
+Some files under `artifacts/` are generated by training. Keep the model and preprocessor artifacts used by the deployed app in sync with the code and dependency versions.
+
+## Dataset and features
+
+The ingestion component expects the CSV at `notebook/data/stud.csv`. The target column is `math_score`. The other columns listed above are used as model inputs.
+
+The project uses a random 80/20 train/test split with `random_state=42`. Preprocessing is fitted on the training data and then applied to the test data.
+
+**Data note:** Use the dataset in accordance with its license and source terms. Do not treat a model prediction as an authoritative assessment of a student.
+
+## Run locally
+
+### 1. Clone the repository
+
+```bash
+git clone <YOUR_GITHUB_REPOSITORY_URL>
+cd mlproject-main
+```
+
+Replace the placeholder URL with your repository URL. If your repository's root folder has a different name, `cd` into that folder instead.
+
+### 2. Create and activate a virtual environment
+
+Windows PowerShell:
+
+```powershell
+py -3.11 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+```
+
+Windows Command Prompt:
+
+```bat
+py -3.11 -m venv .venv
+.venv\Scripts\activate.bat
+```
+
+macOS/Linux:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+```
+
+### 3. Install dependencies
+
+```bash
+python -m pip install --upgrade pip
+pip install -r requirements.txt
+pip install -e .
+```
+
+If a dependency fails to install, check that the Python version and package versions are compatible. For repeatable deployments, pin tested dependency versions in `requirements.txt`.
+
+### 4. Start the Flask app
+
+```bash
+python app.py
+```
+
+Open `http://127.0.0.1:5000` in your browser. The home route is `/`; the prediction form route is `/predictdata`.
+
+The app's development server is intended for local testing. For a public deployment, use the hosting platform's supported production server configuration and follow its current Python platform instructions.
+
+## Train the model
+
+From the project root, with the virtual environment active:
+
+```bash
+python src/components/data_ingestion.py
+```
+
+The script runs data ingestion, transformation, and model training in sequence. It expects the dataset path `notebook/data/stud.csv` to exist relative to the project root.
+
+Expected generated outputs:
+
+- `artifacts/data.csv`
+- `artifacts/train.csv`
+- `artifacts/test.csv`
+- `artifacts/preprocessor.pkl`
+- `artifacts/model.pkl`
+
+Check the console output and logs for the evaluation result. After retraining, run the web application locally and submit sample inputs to confirm that the newly generated artifacts work correctly.
+
+## Model artifacts
+
+- `artifacts/preprocessor.pkl` stores the fitted preprocessing transformer.
+- `artifacts/model.pkl` stores the trained regression model.
+- Both are loaded by `PredictPipeline` when a prediction is requested.
+
+Only load pickle/dill files that you created or otherwise trust: deserializing untrusted files can execute arbitrary code. Model artifacts should be produced and deployed together, and the dependency versions used to load them should be compatible with the training environment.
+
+## Deployment options
+
+### Option A — AWS Elastic Beanstalk (recommended learning path)
+
+Elastic Beanstalk manages much of the environment provisioning and application deployment for you while running the application on AWS infrastructure. For a first cloud deployment, it is usually simpler than manually configuring an EC2 instance.
+
+High-level checklist:
+
+1. Confirm the app runs locally and that all prediction inputs work.
+2. Confirm `requirements.txt` includes every runtime dependency and test the app with a clean environment.
+3. Create an Elastic Beanstalk **Python** application/environment in the AWS Console, choosing a supported Python platform version compatible with the project.
+4. Configure the application entry point and WSGI callable according to the current Elastic Beanstalk Python platform documentation. This project exposes `application` in `app.py`; verify the platform's expected startup command before deploying.
+5. Deploy the source bundle, then inspect environment health and logs.
+6. Test the deployed URL and submit a prediction.
+7. Configure a GitHub Actions workflow to deploy after a successful push to the chosen branch.
+
+Official guide: https://docs.aws.amazon.com/elasticbeanstalk/latest/dg/Welcome.html
+
+### Option B — Amazon EC2
+
+EC2 gives you more control but requires you to manage the server setup and application process. Typical steps include:
+
+1. Launch an EC2 instance using a supported Linux image.
+2. Configure a security group to allow SSH only from your own IP and allow public HTTP/HTTPS traffic as needed.
+3. Connect securely, update packages, and install the compatible Python runtime and Git.
+4. Clone the repository and create a virtual environment.
+5. Install dependencies and confirm the app works locally on the instance.
+6. Run the application behind a production WSGI server and a reverse proxy such as Nginx; do not expose Flask's development server as the production server.
+7. Configure a service manager so the application restarts after a reboot.
+8. Add monitoring, logs, TLS/HTTPS, and a safe deployment/rollback process.
+9. Automate deployments with GitHub Actions plus a deployment mechanism such as AWS CodeDeploy, rather than placing permanent AWS credentials or private keys in the repository.
+
+Official CodeDeploy tutorial: https://docs.aws.amazon.com/codedeploy/latest/userguide/tutorials-github.html
+
+## CI/CD concept
+
+A practical GitHub Actions pipeline can follow this flow:
+
+```text
+Developer pushes code to GitHub
+            |
+            v
+GitHub Actions checks out the repository
+            |
+            v
+Install dependencies and run checks/tests
+            |
+            v
+Build/package the application
+            |
+            v
+Authenticate to AWS using a restricted IAM role (OIDC preferred)
+            |
+            v
+Deploy to Elastic Beanstalk OR deploy to EC2 through CodeDeploy
+            |
+            v
+Check deployment health and test the live endpoint
+```
+
+Choose **one deployment target per workflow** to start with:
+
+- **Elastic Beanstalk:** use the AWS Elastic Beanstalk deployment action and an IAM role configured for GitHub Actions. AWS documents an OIDC-based approach, which avoids storing long-lived AWS access keys in GitHub secrets.
+- **EC2:** use CodeDeploy with the EC2 instance/agent and an application specification (`appspec.yml`), or another carefully secured deployment mechanism. Do not simply open SSH broadly to the internet.
+
+Official GitHub Actions → Elastic Beanstalk guide: https://docs.aws.amazon.com/elasticbeanstalk/latest/dg/deploying-github-actions.html
+
+### CI/CD security checklist
+
+- Never commit AWS access keys, private SSH keys, `.env` files, or credentials.
+- Prefer GitHub OIDC with a narrowly scoped AWS IAM role.
+- Give deployment permissions only to the required repository/branch and AWS resources.
+- Protect the production branch and run tests before deployment.
+- Review AWS billing, set a budget alert, and stop/delete resources when they are not needed. Free Tier eligibility and charges depend on the account, region, resource types, and usage.
+
+## Troubleshooting
+
+| Issue | Things to check |
+|---|---|
+| `ModuleNotFoundError` | Activate the project's virtual environment and install `requirements.txt`; run commands from the repository root. |
+| Dataset path not found | Confirm `notebook/data/stud.csv` exists and run the training command from the project root. |
+| Model/preprocessor file missing | Run the training pipeline and verify both `.pkl` files are created under `artifacts/`. |
+| Prediction fails after retraining | Ensure the model and preprocessor artifacts were generated together and that input columns match the training schema. |
+| Dependency/build errors in AWS | Match the runtime to a supported Python platform, verify package compatibility, and inspect deployment logs. |
+| Elastic Beanstalk health is degraded | Review environment events and application logs; verify startup configuration and dependency installation. |
+| CI/CD deployment is denied | Review GitHub Actions logs, OIDC trust policy, IAM permissions, AWS region, application/environment names, and required service roles. |
+
+## Important validation notes
+
+Before relying on results or presenting the model-selection process as complete, review the following:
+
+1. **Model evaluation helper:** the current `evaluate_models()` implementation in `src/utils.py` returns `report` from inside its loop. As written, it exits after evaluating the first model. Move the return statement outside the loop and test the helper so every candidate model is evaluated.
+2. **Form-to-feature mapping:** the form field names and labels are not intuitive. Verify reading and writing scores are passed into the matching feature columns, and correct the labels/names together to avoid confusion.
+3. **Testing:** add tests for data transformation, prediction input validation, and the Flask routes.
+4. **Evaluation reporting:** document the actual held-out test score only after running a corrected evaluation. Do not claim an accuracy percentage unless you have measured and verified it; for regression, metrics such as R², MAE, and RMSE are more appropriate than classification accuracy.
+5. **Input validation:** handle missing, non-numeric, and out-of-range score inputs gracefully.
+6. **Deployment:** set production configuration explicitly and use a production server rather than Flask's development server.
+
+## Future improvements
+
+- Fix and test the model-evaluation loop.
+- Compare candidates using cross-validation and report R², MAE, and RMSE.
+- Add unit tests and a CI workflow that runs them before deployment.
+- Improve form styling, validation, and error messages.
+- Add a `/health` endpoint for deployment health checks.
+- Pin dependencies and add reproducible build steps.
+- Add model/version metadata and document dataset provenance.
+- Add monitoring and a rollback strategy for cloud deployments.
+
+## Author
+
+**Harsh Sharma**
+
+If you use or build on this project, please reference the repository and follow the dataset's license and usage terms.
+
+---
+
+*Built as a learning project to practice end-to-end machine learning, Flask integration, and cloud deployment workflows.*
